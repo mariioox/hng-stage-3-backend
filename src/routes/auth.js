@@ -64,9 +64,23 @@ router.get("/callback", async (req, res) => {
       user: { name: user.name, role: user.role },
     });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Authentication failed" });
+    // This will print the actual error from GitHub or Supabase in your terminal
+    console.error("--- Auth Error Details ---");
+    console.error(err.response?.data || err.message);
+    res.status(500).json({
+      error: "Authentication failed",
+      details: err.response?.data?.error_description || err.message,
+    });
   }
+});
+
+// This is used by the CLI to get tokens after the user logs in via browser
+router.get("/session/:code", async (req, res) => {
+  const { code } = req.params;
+
+  // We search for the user who just logged in with this temporary code
+  // For now, let's keep it simple: the CLI will expect tokens in the final callback.
+  // We will refine this once we build the CLI repo.
 });
 
 export default router;
