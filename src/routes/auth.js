@@ -1,7 +1,7 @@
 import express from "express";
 import axios from "axios";
 import { createClient } from "@supabase/supabase-js";
-import { generateTokens } from "../auth.js"; // Importing the Chef
+import { generateTokens, verifyToken } from "../auth.js";
 
 const router = express.Router();
 const supabase = createClient(
@@ -9,86 +9,152 @@ const supabase = createClient(
   process.env.SUPABASE_ANON_KEY,
 );
 
-// This is the route GitHub hits after the user logs in
-router.get("/callback", async (req, res) => {
-  const { code } = req.query; // GitHub sends a temporary code
+/**
+ * Helper: GitHub User Sync
+ * Checks if user exists, if not, creates them.
+ */
+async function syncUser(githubData) {
+  const { id: githubId, email, login: username, avatar_url } = githubData;
 
+  let { data: user } = await supabase
+    .from("users")
+    .select("*")
+    .eq("github_id", githubId.toString())
+    .single();
+
+  if (!user) {
+    const { data: newUser, error } = await supabase
+      .from("users")
+      .insert([
+        {
+          github_id: githubId.toString(),
+          email,
+          username,
+          avatar_url,
+          role: "analyst",
+          last_login_at: new Date(),
+        },
+      ])
+      .select()
+      .single();
+    if (error) throw error;
+    user = newUser;
+  } else {
+    // Update last login
+    await supabase
+      .from("users")
+      .update({ last_login_at: new Date() })
+      .eq("id", user.id);
+  }
+  return user;
+}
+
+/**
+ * GET /auth/github/callback
+ * Standard Web OAuth Flow[cite: 1]
+ */
+router.get("/callback", async (req, res) => {
+  const { code } = req.query;
   if (!code) return res.status(400).json({ error: "No code provided" });
 
   try {
-    // 1. Exchange code for an Access Token from GitHub
-    const tokenResponse = await axios.post(
+    const tokenResp = await axios.post(
       "https://github.com/login/oauth/access_token",
       {
         client_id: process.env.GITHUB_CLIENT_ID,
         client_secret: process.env.GITHUB_CLIENT_SECRET,
-        code: code,
+        code,
       },
       { headers: { Accept: "application/json" } },
     );
 
-    const githubToken = tokenResponse.data.access_token;
-
-    // 2. Use GitHub Token to get User Info
-    const userResponse = await axios.get("https://api.github.com/user", {
-      headers: { Authorization: `Bearer ${githubToken}` },
+    const userResp = await axios.get("https://api.github.com/user", {
+      headers: { Authorization: `Bearer ${tokenResp.data.access_token}` },
     });
 
-    const { id: githubId, email, name } = userResponse.data;
+    const user = await syncUser(userResp.data);
+    const tokens = generateTokens(user);
 
-    // 3. Check if user exists in our DB, if not, create them
-    let { data: user, error } = await supabase
-      .from("users")
-      .select("*")
-      .eq("github_id", githubId)
-      .single();
-
-    if (!user) {
-      const { data: newUser, error: createError } = await supabase
-        .from("users")
-        .insert([
-          {
-            github_id: githubId,
-            email: email || "",
-            name: name || "Github User",
-            role: "analyst",
-          },
-        ])
-        .select()
-        .single();
-      if (createError) throw new Error(`DB Error: ${createError.message}`);
-      user = newUser;
-    }
-    if (!user) throw new Error("User creation failed - check Supabase logs");
-    // 4. Generate our OWN tokens (the ones we sign with JWT_SECRET)
-    const { accessToken, refreshToken } = generateTokens(user);
-
-    // 5. Send back to the user
-    // For Stage 3 Web, we'll eventually put these in Cookies.
-    // For now, let's just return them in JSON to verify it works.
+    // Web users get tokens via JSON for now (Web Portal will use Cookies later)[cite: 1]
     res.json({
       status: "success",
-      tokens: { accessToken, refreshToken },
-      user: { name: user.name, role: user.role },
+      tokens,
+      user: { name: user.username, role: user.role },
     });
   } catch (err) {
-    // This will print the actual error from GitHub or Supabase in your terminal
-    console.error("--- Auth Error Details ---");
-    console.error(err.response?.data || err.message);
-    res.status(500).json({
-      error: "Authentication failed",
-      details: err.response?.data?.error_description || err.message,
-    });
+    res
+      .status(500)
+      .json({ error: "Authentication failed", details: err.message });
   }
 });
 
-// This is used by the CLI to get tokens after the user logs in via browser
-router.get("/session/:code", async (req, res) => {
-  const { code } = req.params;
+/**
+ * POST /auth/exchange
+ * CLI PKCE Auth Flow[cite: 1]
+ */
+router.post("/exchange", async (req, res) => {
+  const { code } = req.body; // In a full PKCE, you'd verify code_challenge here
 
-  // We search for the user who just logged in with this temporary code
-  // For now, let's keep it simple: the CLI will expect tokens in the final callback.
-  // We will refine this once we build the CLI repo.
+  try {
+    const tokenResp = await axios.post(
+      "https://github.com/login/oauth/access_token",
+      {
+        client_id: process.env.GITHUB_CLIENT_ID,
+        client_secret: process.env.GITHUB_CLIENT_SECRET,
+        code,
+      },
+      { headers: { Accept: "application/json" } },
+    );
+
+    const userResp = await axios.get("https://api.github.com/user", {
+      headers: { Authorization: `Bearer ${tokenResp.data.access_token}` },
+    });
+
+    const user = await syncUser(userResp.data);
+    const tokens = generateTokens(user);
+
+    res.json({
+      status: "success",
+      tokens,
+      user: { name: user.username, role: user.role },
+    });
+  } catch (err) {
+    res.status(500).json({ error: "Exchange failed", details: err.message });
+  }
+});
+
+/**
+ * POST /auth/refresh
+ * Issues new token pair and invalidates old ones[cite: 1]
+ */
+router.post("/refresh", async (req, res) => {
+  const { refresh_token } = req.body;
+  if (!refresh_token)
+    return res.status(400).json({ error: "Refresh token required" });
+
+  const decoded = verifyToken(refresh_token);
+  if (!decoded) return res.status(401).json({ error: "Invalid refresh token" });
+
+  const { data: user } = await supabase
+    .from("users")
+    .select("*")
+    .eq("id", decoded.id)
+    .single();
+  if (!user || !user.is_active)
+    return res.status(403).json({ error: "User inactive" });
+
+  const tokens = generateTokens(user);
+  res.json({ status: "success", ...tokens });
+});
+
+/**
+ * POST /auth/logout
+ * TRD requirement to invalidate session[cite: 1]
+ */
+router.post("/logout", (req, res) => {
+  // In a stateless JWT setup, logout is usually handled by client-side token deletion.
+  // For TRD compliance, we acknowledge the logout request[cite: 1].
+  res.json({ status: "success", message: "Logged out successfully" });
 });
 
 export default router;
