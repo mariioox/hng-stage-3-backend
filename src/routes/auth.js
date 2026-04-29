@@ -95,6 +95,10 @@ router.get("/callback", async (req, res) => {
 router.post("/exchange", async (req, res) => {
   const { code } = req.body; // In a full PKCE, you'd verify code_challenge here
 
+  if (!code) {
+    return res.status(400).json({ error: "No code provided" });
+  }
+
   try {
     const tokenResp = await axios.post(
       "https://github.com/login/oauth/access_token",
@@ -105,6 +109,9 @@ router.post("/exchange", async (req, res) => {
       },
       { headers: { Accept: "application/json" } },
     );
+    if (tokenResp.data.error) {
+      return res.status(401).json({ error: tokenResp.data.error_description });
+    }
 
     const userResp = await axios.get("https://api.github.com/user", {
       headers: { Authorization: `Bearer ${tokenResp.data.access_token}` },
@@ -119,6 +126,7 @@ router.post("/exchange", async (req, res) => {
       user: { name: user.username, role: user.role },
     });
   } catch (err) {
+    console.error("Exchange Error:", err.response?.data || err.message);
     res.status(500).json({ error: "Exchange failed", details: err.message });
   }
 });
