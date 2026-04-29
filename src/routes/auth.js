@@ -46,12 +46,20 @@ router.get("/callback", async (req, res) => {
     if (!user) {
       const { data: newUser, error: createError } = await supabase
         .from("users")
-        .insert([{ github_id: githubId, email, name, role: "analyst" }])
+        .insert([
+          {
+            github_id: githubId,
+            email: email || "",
+            name: name || "Github User",
+            role: "analyst",
+          },
+        ])
         .select()
         .single();
+      if (createError) throw new Error(`DB Error: ${createError.message}`);
       user = newUser;
     }
-
+    if (!user) throw new Error("User creation failed - check Supabase logs");
     // 4. Generate our OWN tokens (the ones we sign with JWT_SECRET)
     const { accessToken, refreshToken } = generateTokens(user);
 
