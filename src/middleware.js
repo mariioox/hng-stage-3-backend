@@ -15,12 +15,10 @@ export const authenticate = (req, res, next) => {
   const decoded = verifyToken(token);
 
   if (!decoded) {
-    return res
-      .status(401)
-      .json({
-        status: "error",
-        message: "Unauthorized: Invalid or expired token",
-      });
+    return res.status(401).json({
+      status: "error",
+      message: "Unauthorized: Invalid or expired token",
+    });
   }
 
   // 3. Attach user info to the request for the next step
@@ -32,13 +30,22 @@ export const authenticate = (req, res, next) => {
 export const authorize = (roles = []) => {
   return (req, res, next) => {
     if (!roles.includes(req.user.role)) {
-      return res
-        .status(403)
-        .json({
-          status: "error",
-          message: "Forbidden: Higher privilege required",
-        });
+      return res.status(403).json({
+        status: "error",
+        message: "Forbidden: Higher privilege required",
+      });
     }
     next();
   };
+};
+
+export const validateVersion = (req, res, next) => {
+  const version = req.headers["x-api-version"];
+  if (version !== "1") {
+    return res.status(400).json({
+      status: "error",
+      message: "API version header required",
+    });
+  }
+  next();
 };
