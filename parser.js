@@ -78,8 +78,16 @@ export const parseQuery = (query) => {
   }
 
   // "Above X" Logic
-  const aboveMatch = q.match(/above (\d+)/);
-  if (aboveMatch) filters.min_age = parseInt(aboveMatch[1]);
+  const minAgeMatch = q.match(/(?:above|over|older than)\s+(\d+)/);
+  if (minAgeMatch) {
+    filters.min_age = parseInt(minAgeMatch[1]) + 1;
+  }
+
+  // "Under / Below / Younger than X" Logic
+  const maxAgeMatch = q.match(/(?:under|below|younger than)\s+(\d+)/);
+  if (maxAgeMatch) {
+    filters.max_age = parseInt(maxAgeMatch[1]) - 1;
+  }
 
   // Country Detection
   Object.keys(COUNTRY_MAP).forEach((country) => {
