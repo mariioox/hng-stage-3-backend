@@ -119,7 +119,7 @@ router.post("/exchange", async (req, res) => {
       res.cookie("accessToken", accessToken, {
         httpOnly: true, // Prevents JavaScript access (XSS protection)
         secure: process.env.NODE_ENV === "production", // Only send over HTTPS in production
-        sameSite: "strict", // CSRF protection
+        sameSite: "lax", // CSRF protection
         maxAge: 3600000, // 1 hour
       });
 
