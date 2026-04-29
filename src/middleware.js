@@ -1,7 +1,7 @@
 import { verifyToken } from "./auth.js";
 
 export const authenticate = (req, res, next) => {
-  // 1. Get token from Header (CLI) or Cookie (Web Portal)
+  // Get token from Header (CLI) or Cookie (Web Portal)
   const authHeader = req.headers.authorization;
   const token = authHeader?.split(" ")[1] || req.cookies?.accessToken;
 
@@ -11,7 +11,7 @@ export const authenticate = (req, res, next) => {
       .json({ status: "error", message: "Unauthorized: No token provided" });
   }
 
-  // 2. Verify the token using our Chef (auth.js)
+  // Verify the token using auth.js
   const decoded = verifyToken(token);
 
   if (!decoded) {
@@ -21,7 +21,7 @@ export const authenticate = (req, res, next) => {
     });
   }
 
-  // 3. Attach user info to the request for the next step
+  // Attach user info to the request for the next step
   req.user = decoded;
   next();
 };

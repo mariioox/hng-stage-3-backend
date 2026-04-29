@@ -1,6 +1,5 @@
 import jwt from "jsonwebtoken";
 
-// The Chef's secret recipes
 export const generateTokens = (user) => {
   const payload = {
     id: user.id,
@@ -13,7 +12,7 @@ export const generateTokens = (user) => {
     expiresIn: "15m",
   });
 
-  // Refresh token lasts longer (7 days)
+  // Refresh token lasts longer
   const refreshToken = jwt.sign({ id: user.id }, process.env.JWT_SECRET, {
     expiresIn: "7d",
   });

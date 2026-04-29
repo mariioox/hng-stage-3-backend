@@ -11,9 +11,7 @@ const supabase = createClient(
   process.env.SUPABASE_ANON_KEY,
 );
 
-/**
- * Middleware: Check for X-API-Version header
- */
+/*  Middleware: Check for X-API-Version header  */
 router.use((req, res, next) => {
   if (req.headers["x-api-version"] !== "1") {
     return res.status(400).json({
@@ -24,9 +22,7 @@ router.use((req, res, next) => {
   next();
 });
 
-/**
- * Helper: Reusable Database Logic with Pagination[cite: 1, 2]
- */
+/*  Helper: Reusable Database Logic with Pagination  */
 async function getProfiles(filters, pagination) {
   const { gender, age_group, country_id, min_age, max_age } = filters;
   const { page, limit, sort_by, order } = pagination;
@@ -51,9 +47,7 @@ async function getProfiles(filters, pagination) {
   return { data, count, error, p, l };
 }
 
-/**
- * Helper: Build Pagination Links[cite: 1, 2]
- */
+/*  Helper: Build Pagination Links  */
 const buildLinks = (req, page, limit, totalCount) => {
   const totalPages = Math.ceil(totalCount / limit);
   const url = `${req.baseUrl}${req.path}`;
@@ -74,9 +68,7 @@ const buildLinks = (req, page, limit, totalCount) => {
   };
 };
 
-/**
- * GET /api/v1/profiles - List profiles[cite: 1, 2]
- */
+/*  GET /api/v1/profiles - List profiles  */
 router.get("/", authenticate, async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
@@ -111,17 +103,13 @@ router.get("/", authenticate, async (req, res) => {
   }
 });
 
-/**
- * GET /api/v1/profiles/export - Admin only CSV export[cite: 1, 2]
- */
+/*  GET /api/v1/profiles/export - Admin only CSV export  */
 router.get("/export", authenticate, authorize(["admin"]), async (req, res) => {
   if (req.query.format !== "csv") {
-    return res
-      .status(400)
-      .json({
-        status: "error",
-        message: "Invalid format. Only CSV is supported.",
-      });
+    return res.status(400).json({
+      status: "error",
+      message: "Invalid format. Only CSV is supported.",
+    });
   }
 
   try {
@@ -156,9 +144,7 @@ router.get("/export", authenticate, authorize(["admin"]), async (req, res) => {
   }
 });
 
-/**
- * GET /api/v1/profiles/search - Natural Language Search[cite: 1, 2]
- */
+/*  GET /api/v1/profiles/search - Natural Language Search  */
 router.get("/search", authenticate, async (req, res) => {
   const { q, page = 1, limit = 10 } = req.query;
   if (!q)
@@ -168,12 +154,10 @@ router.get("/search", authenticate, async (req, res) => {
 
   const filters = parseQuery(q);
   if (!filters)
-    return res
-      .status(400)
-      .json({
-        status: "error",
-        message: "Unable to interpret natural language query",
-      });
+    return res.status(400).json({
+      status: "error",
+      message: "Unable to interpret natural language query",
+    });
 
   const result = await getProfiles(filters, {
     page: parseInt(page),
@@ -204,9 +188,7 @@ router.get("/search", authenticate, async (req, res) => {
   });
 });
 
-/**
- * GET /api/v1/profiles/:id - Detail view[cite: 1, 2]
- */
+/*  GET /api/v1/profiles/:id - Detail view  */
 router.get("/:id", authenticate, async (req, res) => {
   const { id } = req.params;
   if (!isUuid(id))

@@ -9,10 +9,7 @@ const supabase = createClient(
   process.env.SUPABASE_ANON_KEY,
 );
 
-/**
- * Helper: GitHub User Sync
- * Checks if user exists, if not, creates them.
- */
+/*  Checks if user exists, if not, creates them.  */
 async function syncUser(githubData) {
   const { id: githubId, email, login: username, avatar_url } = githubData;
 
@@ -49,10 +46,8 @@ async function syncUser(githubData) {
   return user;
 }
 
-/**
- * GET /auth/github/callback
- * Standard Web OAuth Flow[cite: 1]
- */
+/* GET /auth/github/callback
+ * Standard Web OAuth Flow */
 router.get("/callback", async (req, res) => {
   const { code } = req.query;
   if (!code) return res.status(400).json({ error: "No code provided" });
@@ -75,7 +70,7 @@ router.get("/callback", async (req, res) => {
     const user = await syncUser(userResp.data);
     const tokens = generateTokens(user);
 
-    // Web users get tokens via JSON for now (Web Portal will use Cookies later)[cite: 1]
+    // Web users get tokens via JSON for now (Web Portal will use Cookies later)
     res.json({
       status: "success",
       tokens,
@@ -88,12 +83,10 @@ router.get("/callback", async (req, res) => {
   }
 });
 
-/**
- * POST /auth/exchange
- * CLI PKCE Auth Flow[cite: 1]
- */
+/* POST /auth/exchange
+ * CLI PKCE Auth Flow */
 router.post("/exchange", async (req, res) => {
-  const { code } = req.body; // In a full PKCE, you'd verify code_challenge here
+  const { code } = req.body;
 
   if (!code) {
     return res.status(400).json({ error: "No code provided" });
@@ -131,10 +124,8 @@ router.post("/exchange", async (req, res) => {
   }
 });
 
-/**
- * POST /auth/refresh
- * Issues new token pair and invalidates old ones[cite: 1]
- */
+/* POST /auth/refresh
+ * Issues new token pair and invalidates old ones */
 router.post("/refresh", async (req, res) => {
   const { refresh_token } = req.body;
   if (!refresh_token)
@@ -155,13 +146,11 @@ router.post("/refresh", async (req, res) => {
   res.json({ status: "success", ...tokens });
 });
 
-/**
- * POST /auth/logout
- * TRD requirement to invalidate session[cite: 1]
- */
+/* POST /auth/logout
+ * TRD requirement to invalidate session */
 router.post("/logout", (req, res) => {
   // In a stateless JWT setup, logout is usually handled by client-side token deletion.
-  // For TRD compliance, we acknowledge the logout request[cite: 1].
+  // For TRD compliance, we acknowledge the logout request.
   res.json({ status: "success", message: "Logged out successfully" });
 });
 
