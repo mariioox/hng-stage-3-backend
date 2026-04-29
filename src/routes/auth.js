@@ -86,7 +86,7 @@ router.get("/callback", async (req, res) => {
 /* POST /auth/exchange
  * CLI PKCE Auth Flow */
 router.post("/exchange", async (req, res) => {
-  const { code } = req.body;
+  const { code, client_type } = req.body; // client_type: 'web' or 'cli'
 
   if (!code) {
     return res.status(400).json({ error: "No code provided" });
@@ -102,6 +102,7 @@ router.post("/exchange", async (req, res) => {
       },
       { headers: { Accept: "application/json" } },
     );
+
     if (tokenResp.data.error) {
       return res.status(401).json({ error: tokenResp.data.error_description });
     }
@@ -111,11 +112,28 @@ router.post("/exchange", async (req, res) => {
     });
 
     const user = await syncUser(userResp.data);
-    const tokens = generateTokens(user);
+    const { accessToken, refreshToken } = generateTokens(user);
 
+    // --- WEB CLIENT LOGIC (HTTP-ONLY COOKIES) ---
+    if (client_type === "web") {
+      res.cookie("accessToken", accessToken, {
+        httpOnly: true, // Prevents JavaScript access (XSS protection)
+        secure: process.env.NODE_ENV === "production", // Only send over HTTPS in production
+        sameSite: "strict", // CSRF protection
+        maxAge: 3600000, // 1 hour
+      });
+
+      // We still return user info, but NO tokens in the JSON body
+      return res.json({
+        status: "success",
+        user: { name: user.username, role: user.role },
+      });
+    }
+
+    // --- CLI CLIENT LOGIC (LEGACY JSON) ---
     res.json({
       status: "success",
-      tokens,
+      tokens: { accessToken, refreshToken },
       user: { name: user.username, role: user.role },
     });
   } catch (err) {
