@@ -9,7 +9,12 @@ import profileRoutes from "./src/routes/profiles.js";
 const app = express();
 
 // Standard Middleware
-app.use(cors({ origin: "*", credentials: true }));
+app.use(
+  cors({
+    origin: ["http://localhost:3000", "https://your-web-portal.vercel.app"],
+    credentials: true, // Required for the browser to accept and send cookies
+  }),
+);
 app.use(express.json());
 app.use(cookieParser());
 
