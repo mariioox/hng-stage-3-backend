@@ -11,7 +11,10 @@ const app = express();
 // Standard Middleware
 app.use(
   cors({
-    origin: ["http://localhost:3000", "https://your-web-portal.vercel.app"],
+    origin: [
+      "http://localhost:5173",
+      "https://hng-stage-3-backend-pi.vercel.app",
+    ],
     credentials: true, // Required for the browser to accept and send cookies
   }),
 );
