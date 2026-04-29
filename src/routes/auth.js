@@ -118,8 +118,8 @@ router.post("/exchange", async (req, res) => {
     if (client_type === "web") {
       res.cookie("accessToken", accessToken, {
         httpOnly: true, // Prevents JavaScript access (XSS protection)
-        secure: process.env.NODE_ENV === "production", // Only send over HTTPS in production
-        sameSite: "lax", // CSRF protection
+        secure: true, // Only send over HTTPS in production
+        sameSite: "none", // CSRF protection
         maxAge: 3600000, // 1 hour
       });
 
